@@ -21,6 +21,7 @@ float shield = 0.0f;
 bool respawned = false; 
 bool pauseGameBool = false, needsKey[] = {1, 1, 1, 1}, needsPermit[] = {1, 1, 1, 1}, keyAvailable = true, permitAvailable = true;
 
+
 //PRODUCER (another thread) - CONSUMER (ScoreThread)
 // power pallet number = 4 in grid 
 mutex consumed;
@@ -55,13 +56,14 @@ struct ghostStruct
 {
     int x;
     int y;
+    sf::Color color;
     int ghostGridX;
     int ghostGridY;
-    //RectangleShape ghostSprite;
     Texture t;
     Sprite  ghostSprite;
     bool insideHome = true;
     bool eaten = false;
+    bool gohome = false;
     ghostStruct()
     {
         t.loadFromFile("hi.png");
@@ -76,8 +78,9 @@ struct ghostStruct
     {
        if(ghostSprite.getGlobalBounds().intersects(pacman.pacmanSprite.getGlobalBounds()) && !this->eaten)
        {
-        ghostSprite.setColor(Color::White);
+     //   ghostSprite.setColor(Color::White);
         (this->eaten = true); 
+        gohome = true;
         return true;           
        }
        return false;
@@ -95,7 +98,7 @@ struct ghostStruct
        }
        return false;
     }
-} ghost1;
+} ghost1, ghost2;
 
 void resetMaze()
 {
@@ -114,7 +117,7 @@ void resetMaze()
 void displaycoins(RenderWindow &window, CircleShape coins)
 {
     RectangleShape wall(Vector2f(20, 20));
-    wall.setFillColor(Color::Blue); // Set fill color
+    wall.setFillColor(Color{131,74,51,255}); // Set fill color
     coins.setFillColor(Color::Yellow);
     CircleShape pallet;
     pallet.setRadius(5);
@@ -148,9 +151,7 @@ void eatpallet()
     if (grid[pacman.pacmanGridY][pacman.pacmanGridX] == 1){// normal coins collection
             grid[pacman.pacmanGridY][pacman.pacmanGridX] = 2;
             ++score;}
-    if(ghost1.colide()) score += 200; 
-    
-    
+    if(ghost1.colide() || ghost2.colide() ) score += 200;    
 }
 void *producepallet(void *arg)
 {
@@ -193,7 +194,8 @@ void *incScore(void *arg)
             allow = false; 
             grid[pacman.pacmanGridY][pacman.pacmanGridX] = 2;
             score += 20; 
-            ghost1.ghostSprite.setColor(Color::Cyan); 
+            ghost1.ghostSprite.setColor(Color{0,150,255,255}); 
+            ghost2.ghostSprite.setColor(Color{0,150,255,255}); 
         //  critical section  
         while(!allow)  // jab tak doosra pallet lena is not allowed 
         {  
@@ -204,7 +206,8 @@ void *incScore(void *arg)
         {
             ConsumptionTime = 0.0f;
             consumed.unlock();    // mutex unlock 
-            ghost1.ghostSprite.setColor(Color::Magenta);
+            ghost1.ghostSprite.setColor(Color::Magenta); 
+            ghost2.ghostSprite.setColor(Color::Red); 
             allow = true;
         }           
            eatpallet();
@@ -220,22 +223,37 @@ void *incScore(void *arg)
 pthread_exit(0);
 }
 
-void *sfmlWindow(void *p)
-{
-    RenderWindow window(VideoMode(800, 800), "PAC-MAN");
-    RenderWindow window2(VideoMode(800, 800), "Input Handling");
-
-    window.setPosition(Vector2i(100, 100));
-    window2.setPosition(Vector2i(1000, 100));
-
+void* mainthread(void* p)
+{   
     pacman.pacmanGridX = 29;
     pacman.pacmanGridY = 27;
     pacman.x = 25 * pacman.pacmanGridX + 9;
     pacman.y = 25 * pacman.pacmanGridY + 9;
-    //pacman.pacmanSprite.setRadius(13);
-    //pacman.pacmanSprite.setColor(Color::Yellow);
     pacman.pacmanSprite.setPosition(pacman.x, pacman.y);
 
+    while(!shouldExit) 
+    {
+        pacman.pacmanSprite.setPosition(pacman.x, pacman.y);
+        ghost1.ghostSprite.setPosition(ghost1.x, ghost1.y);
+        
+        ghost2.ghostSprite.setPosition(ghost2.x, ghost2.y);
+        if(!respawned)
+        {
+        ghost1.collide();
+        ghost2.collide();
+        }
+
+        usleep(uSleepTime);
+    }
+    resetMaze();
+pthread_exit(0);
+}
+
+void *sfmlWindow(void *p)
+{
+     
+    RenderWindow window(VideoMode(1030, 750), "PAC-MAN");
+    window.setPosition(Vector2i(380, 180));
     CircleShape coins;
     coins.setRadius(3);
     coins.setFillColor(Color::Cyan);
@@ -247,21 +265,21 @@ void *sfmlWindow(void *p)
     text.setCharacterSize(24);
     text.setFillColor(Color::White);
 
-    Text scoreText("Score: ", font, 20), scoreIntText(to_string(score), font, 20);
+    Text scoreText("Score: ", font, 30), scoreIntText(to_string(score), font, 35);
     scoreText.setFillColor(Color::White);
-    scoreText.setPosition(10, 10);
+    scoreText.setPosition(810, 10);
     scoreIntText.setFillColor(Color::White);
     scoreIntText.setPosition(scoreText.getPosition().x + scoreText.getLocalBounds().width, 10);
 
-    Text scText("Powerpallets: ", font, 20), scIntText(to_string(pallet_count), font, 20);
+    Text scText("Pallets: ", font, 30), scIntText(to_string(pallet_count), font, 30);
     scText.setFillColor(Color::White);
-    scText.setPosition(28, 28);
+    scText.setPosition(810, 45);
     scIntText.setFillColor(Color::White);
-    scIntText.setPosition(scText.getPosition().x + scText.getLocalBounds().width, 28);
+    scIntText.setPosition(scText.getPosition().x + scText.getLocalBounds().width, 45);
 
-    Text gameover("Game Over :(", font, 20);
+    Text gameover("Game Over :(", font, 30);
     gameover.setFillColor(Color::Magenta);
-    gameover.setPosition(38,38);
+    gameover.setPosition(810,75);
 
     Texture live;
     live.loadFromFile("heart.png");
@@ -288,8 +306,8 @@ void *sfmlWindow(void *p)
             }
         }
 
-        // Check events for window 2
-        while (window2.pollEvent(event))
+        // Check INPUTS
+      //  while (window.pollEvent(event))
         {
             if (event.type == Event::Closed)
             {
@@ -329,45 +347,43 @@ void *sfmlWindow(void *p)
        
 
         window.clear();
-        window2.clear();
+       // window.clear();
 
-        pacman.pacmanSprite.setPosition(pacman.x, pacman.y);
-        ghost1.ghostSprite.setPosition(ghost1.x, ghost1.y);
         displaycoins(window, coins);
 
         window.draw(text);
+
         window.draw(ghost1.ghostSprite);
+        window.draw(ghost2.ghostSprite);
+        
         window.draw(pacman.pacmanSprite);
 
-        window2.draw(scoreText);
+        window.draw(scoreText);
         scoreIntText.setString(to_string(score));
-        window2.draw(scoreIntText);
+        window.draw(scoreIntText);
 
         if(lives <= 0 )
-        {window2.draw(gameover);}
+        {window.draw(gameover);}
 
-        window2.draw(scText);
+        window.draw(scText);
         scIntText.setString(to_string(pallet_count));
-        window2.draw(scIntText);
+        window.draw(scIntText);
         
         for(int i=0; i <lives; i++)
         {
-            hearts.setPosition(0+ i*50, 750.0f);
+            hearts.setPosition(820 + i*60, 100);
             window.draw(hearts);
         }
 
         window.display();
-        window2.display();
+       // window2.display();
       
 
         usleep(uSleepTime);
     }
 
     window.close();
-    window2.close();
-
-    resetMaze();
-
+   // window2.close();
     pthread_exit(0);
 }
 
@@ -418,6 +434,8 @@ void *pacmanMovement(void *arg)
         pacman.y = 25 * pacman.pacmanGridY + 9;
         pacman.direction = prevDirection;
 
+
+        // Dead -- with shield on 
         while(respawned)
         {
             shield += clock1.restart().asSeconds();  
@@ -457,14 +475,150 @@ void leaveHouse(int ghostID)
     }
 }
 
-void gohome(ghostStruct &ghost)
+void ghostup(ghostStruct &ghost)
 {
-    // check for preferences 
-  int rit = ghost.ghostGridX - 13;
-  int up = ghost.ghostGridY - 15;
-  if(up>0)  // up is prefered
-  {
-  } 
+                --ghost.ghostGridY;
+                ghost.x = 25 * ghost.ghostGridX + 10;
+                ghost.y = 25 * ghost.ghostGridY + 10;
+                usleep(uSleepTime + 50000);
+}
+void ghostdown(ghostStruct &ghost)
+{
+                ++ghost.ghostGridY;
+                ghost.x = 25 * ghost.ghostGridX + 10;
+                ghost.y = 25 * ghost.ghostGridY + 10;                
+                usleep(uSleepTime + 50000);
+}
+void ghostleft(ghostStruct &ghost)
+{
+        --ghost.ghostGridX;
+        ghost.x = 25 * ghost.ghostGridX + 10;
+        ghost.y = 25 * ghost.ghostGridY + 10; 
+
+if (ghost.ghostGridX == 0) 
+{
+    cout<<"TELE1"<<endl;
+    ghost.ghostGridX = cols - 1;
+    ghost.ghostGridY += 2;
+    ghost.x = 25 * ghost.ghostGridX + 10;
+    ghost.y = 25 * ghost.ghostGridY + 10;
+
+}  
+        usleep(uSleepTime + 50000);
+}
+void ghostright(ghostStruct &ghost)
+{ 
+                ++ghost.ghostGridX;
+        ghost.x = 25 * ghost.ghostGridX + 10;
+        ghost.y = 25 * ghost.ghostGridY + 10;           
+        usleep(uSleepTime + 50000);
+if (ghost.ghostGridX == cols - 1) 
+{
+    cout << "TELE2" << endl;
+    ghost.ghostGridX = 0;
+    ghost.ghostGridY -= 2;
+    ghost.x = 25 * ghost.ghostGridX + 10;
+    ghost.y = 25 * ghost.ghostGridY + 10;
+
+}
+}
+
+int semi_Ai(ghostStruct &ghost, int prev, pair<int, int> pref)
+{
+ bool av[4] = {0,0,0,0};  // up, down, left , right
+ // if (pref.first != 0 || pref.second != 0) 
+{
+            // available and preferred 
+    if (grid[ghost.ghostGridY - 1][ghost.ghostGridX] != 0 && prev !=1 )
+            {
+            av[0] =1; 
+            if (pref.first > 0)  // available and preffered
+            {
+            //  go up  
+            ghostup(ghost);               
+            return 0;       
+            }
+            }
+
+    if (grid[ghost.ghostGridY][ghost.ghostGridX -1] != 0 && prev !=3)
+            {
+            av[2] =1;
+            if (pref.second > 0)  // available and preffered
+            {
+            //  go left 
+            ghostleft(ghost); 
+            return  2;   
+            }
+            }
+    if (grid[ghost.ghostGridY + 1][ghost.ghostGridX] != 0 && prev !=0)
+            {av[1] =1;
+            if (pref.first < 0)  // available and preffered
+            {
+            //  go down
+            ghostdown(ghost); 
+            return 1;   
+            }
+            }
+    if (grid[ghost.ghostGridY][ghost.ghostGridX+1] != 0 && prev !=2)
+            {
+            av[3] =1;
+            if (pref.second < 0)  // available and preffered
+            {
+            //  go right
+            ghostright(ghost); 
+            return  3;   
+            }
+            }    
+
+// else -> just available 
+            if (av[0] && prev !=1)
+            {ghostup(ghost);               
+            return 0;
+            }
+            else if (av[1] && prev !=0)
+            {
+            //  go down
+            ghostdown(ghost); 
+            return 1;
+            }
+            else if (av[2]  && prev !=3)
+            {
+            //  go left 
+            ghostleft(ghost); 
+            return 2;
+            }
+            else
+            { //  go right
+            ghostright(ghost); 
+            return 3;
+            }
+            }
+}
+
+int go_home(ghostStruct &ghost, int prev)
+{
+    // check for preferences  home = ( 13, 15 )
+    pair <int, int> pref = make_pair(ghost.ghostGridY - 13, ghost.ghostGridX - 15) ;
+    bool av[4] = {0,0,0,0};  // up, down, left , right
+
+if (pref.first != 0 || pref.second != 0)
+{
+//ghost.ghostSprite.setColor(Color{255,255,0,200});
+ghost.ghostSprite.setColor(Color::White);
+return semi_Ai(ghost, prev, pref);
+}
+else
+{ //reached home 
+  ghost.eaten = false; 
+  ghost.ghostSprite.setColor(ghost.color);
+  ghostdown(ghost); 
+return 1; 
+}
+
+}
+
+void random_move()
+{
 
 }
 
@@ -473,22 +627,20 @@ void *ghost1Movement(void *arg)
     // int* ghost = (int*)arg;
     // int& ghostID = *ghost;
     // leaveHouse(ghostID);
-
-    ghost1.ghostGridX = 13;
-    ghost1.ghostGridY = 15;
+    ghost1.color = (Color::Magenta);
+    ghost1.ghostGridX = 27;
+    ghost1.ghostGridY = 27;
     ghost1.x = 25 * ghost1.ghostGridX + 15;
     ghost1.y = 25 * ghost1.ghostGridY + 15;
-   // ghost1.ghostSprite.setSize(Vector2f(20, 20));
-    ghost1.ghostSprite.setColor(Color::Magenta); // Set color to pink
+    ghost1.ghostSprite.setColor(Color::Magenta);
     ghost1.ghostSprite.setPosition(ghost1.x, ghost1.y);
 
     int prevDirec, directionInt = 0, actualMovement = 0;
 
     while (!shouldExit)
     {
-       // if(!ghost1.eaten)
+        if(!ghost1.eaten)   
         {
-         ghost1.collide();
         if (ghost1.insideHome && ghost1.ghostGridX == 15 && ghost1.ghostGridY == 14)
         {
             // take that path and LEAVE (astaghfirullah that ghost is not a female bro. the ghost identify as a ghost)
@@ -503,11 +655,9 @@ void *ghost1Movement(void *arg)
         {
             while (grid[ghost1.ghostGridY - 1][ghost1.ghostGridX] != 0)
             {
-                --ghost1.ghostGridY;
-                ghost1.x = 25 * ghost1.ghostGridX + 10;
-                ghost1.y = 25 * ghost1.ghostGridY + 10;
+                ghostup(ghost1);               
                 prevDirec = 0;
-                usleep(uSleepTime + 50000);
+                
 
                 if (grid[ghost1.ghostGridY][ghost1.ghostGridX + 1] != 1 || grid[ghost1.ghostGridY][ghost1.ghostGridX - 1] != 1) 
                 {
@@ -523,12 +673,8 @@ void *ghost1Movement(void *arg)
                 {
                     break;
                 }
-
-                ++ghost1.ghostGridY;
-                ghost1.x = 25 * ghost1.ghostGridX + 10;
-                ghost1.y = 25 * ghost1.ghostGridY + 10;
+                ghostdown(ghost1); 
                 prevDirec = 1;
-                usleep(uSleepTime + 50000);
 
                 if (grid[ghost1.ghostGridY][ghost1.ghostGridX + 1] != 1 || grid[ghost1.ghostGridY][ghost1.ghostGridX - 1] != 1) 
                 {
@@ -538,23 +684,11 @@ void *ghost1Movement(void *arg)
         }
         else if (directionInt == 2 && prevDirec != 3) // left
         {
-            if (ghost1.ghostGridX == 0) 
-            {
-                ghost1.ghostGridX = cols - 1;
-                ghost1.ghostGridY += 2;
-                ghost1.x = 25 * ghost1.ghostGridX + 10;
-                ghost1.y = 25 * ghost1.ghostGridY + 10;
-                prevDirec = 2;
-                usleep(uSleepTime + 50000);
-            }
 
             while (ghost1.ghostGridX != 0 && grid[ghost1.ghostGridY][ghost1.ghostGridX - 1] != 0)
             {
-                --ghost1.ghostGridX;
-                ghost1.x = 25 * ghost1.ghostGridX + 10;
-                ghost1.y = 25 * ghost1.ghostGridY + 10;
+                ghostleft(ghost1); 
                 prevDirec = 2;
-                usleep(uSleepTime + 50000);
 
                 if (grid[ghost1.ghostGridY + 1][ghost1.ghostGridX] != 1 || grid[ghost1.ghostGridY - 1][ghost1.ghostGridX] != 1) 
                 {
@@ -564,24 +698,12 @@ void *ghost1Movement(void *arg)
         }
         else if (directionInt == 3 && prevDirec != 2) // right
         {
-            if (ghost1.ghostGridX == cols - 1) 
-            {
-                cout << "TELE2" << endl;
-                ghost1.ghostGridX = 0;
-                ghost1.ghostGridY -= 2;
-                ghost1.x = 25 * ghost1.ghostGridX + 10;
-                ghost1.y = 25 * ghost1.ghostGridY + 10;
-                prevDirec = 3;
-                usleep(uSleepTime + 50000);
-            }
+           
 
             while (ghost1.ghostGridX != cols - 1 && grid[ghost1.ghostGridY][ghost1.ghostGridX + 1] != 0)
             {
-                ++ghost1.ghostGridX;
-                ghost1.x = 25 * ghost1.ghostGridX + 10;
-                ghost1.y = 25 * ghost1.ghostGridY + 10;
+                ghostright(ghost1); 
                 prevDirec = 3;
-                usleep(uSleepTime + 50000);
 
                 if (grid[ghost1.ghostGridY + 1][ghost1.ghostGridX] != 1 || grid[ghost1.ghostGridY - 1][ghost1.ghostGridX] != 1) 
                 {
@@ -589,11 +711,12 @@ void *ghost1Movement(void *arg)
                 }
             }
         }
-        }
-      //  else
+        }       
+       else
         {
-            // just go to home 
-       //     gohome(ghost1);
+        // just go to home 
+         ghost1.ghostSprite.setColor(Color::White);
+         prevDirec = go_home(ghost1 , prevDirec);
         }
     }
 
@@ -602,6 +725,30 @@ void *ghost1Movement(void *arg)
 
 void *ghost2Movement(void *arg)
 {
+    ghost2.color = (Color::Red);
+    ghost2.ghostGridX = 1;
+    ghost2.ghostGridY = 9;
+    ghost2.x = 25 * ghost2.ghostGridX + 15;
+    ghost2.y = 25 * ghost2.ghostGridY + 15;
+    ghost2.ghostSprite.setColor(Color{250,0,0,255});
+    ghost2.ghostSprite.setPosition(ghost2.x, ghost2.y);
+
+    int prevDirec, directionInt = 0, actualMovement = 0;
+
+    while (!shouldExit)
+    {
+        if(!ghost2.eaten)   
+        {
+        pair <int, int> pref = make_pair(ghost2.ghostGridY - pacman.pacmanGridY, ghost2.ghostGridX - pacman.pacmanGridX); 
+        prevDirec =  semi_Ai(ghost2, prevDirec, pref);
+        }
+        else
+        {
+        // just go to home 
+         ghost2.ghostSprite.setColor(Color::White);
+         prevDirec = go_home(ghost2 , prevDirec);
+        }
+    }
 
     pthread_exit(0);
 }
@@ -623,20 +770,21 @@ int main()
     srand(time(0));
 
     mutex only1GhostCanLeave;
-
     int gID1 = 1, gID2 = 2, gID3 = 3, gID4 = 4;
 
     pthread_t pacmanThread, ghost1Thread, ghost2Thread, ghost3Thread, ghost4Thread, sfmlThread;
+    pthread_t main_thread;
+    pthread_create(&main_thread, nullptr, &mainthread,nullptr);
     pthread_create(&sfmlThread, nullptr, &sfmlWindow, nullptr);
     pthread_create(&pacmanThread, nullptr, &pacmanMovement, nullptr);
 
     // ghost with random movemnt
     pthread_create(&ghost1Thread, nullptr, &ghost1Movement, nullptr);
 
-    // pthread_create(&ghost2Thread, nullptr, &ghost2Movement, (void *)&gID2);
+     pthread_create(&ghost2Thread, nullptr, &ghost2Movement, nullptr);
     // pthread_create(&ghost3Thread, nullptr, &ghost3Movement, (void *)&gID3);
     // pthread_create(&ghost4Thread, nullptr, &ghost4Movement, (void *)&gID4);
-
+    pthread_join(main_thread, NULL);
     pthread_join(sfmlThread, nullptr);
     pthread_join(pacmanThread, NULL);
     pthread_join(ghost1Thread, nullptr);
