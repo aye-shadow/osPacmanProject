@@ -15,7 +15,7 @@ pthread_t scoreThread, ProducePallets;
 bool shouldExit = false;
 string action = "";
 char prevDirection = ' ', directon[] = {'U', 'D', 'R', 'L'};
-int uSleepTime = 10000, score = 0, lives = 3;
+int uSleepTime = 450, score = 0, lives = 3;
 int uSleep = 100000;
 float respawntime = 3.0f;
 float shield = 0.0f;
@@ -35,6 +35,10 @@ bool allow = true;
 int readers = 0;
 bool tickets[4] = {0,0,0,0};
 int priorities[4] = {0,0,0,0};
+
+//GHOST HOUSE 
+bool key[5] = {0,0,0,0,1};
+
 
 struct pacmanStruct
 {
@@ -66,7 +70,7 @@ struct ghostStruct
     Texture t;
     Sprite ghostSprite;
     bool insideHome = true;
-    bool eaten = true;
+    bool eaten = false;
     bool gohome = false;
     ghostStruct()
     {
@@ -101,6 +105,18 @@ struct ghostStruct
         }
         return false;
     }
+    bool isInHome() 
+    {
+        if (ghostGridX >= 12 && ghostGridX <= 18 && ghostGridY >= 14 && ghostGridY <= 18)
+        {
+            return true;
+        }
+        else 
+        {
+            return false;
+        }
+    }
+
 } ghost1, ghost2, ghost3, ghost4;
 
 int m_p()
@@ -479,30 +495,8 @@ void *pacmanMovement(void *arg)
     pthread_exit(0);
 }
 
-void leaveHouse(int ghostID)
-{
-    while (!keyAvailable)
-    {
-    };
 
-    if (needsKey[ghostID - 1] == true)
-    {
-        keyAvailable = false;
-        needsKey[ghostID - 1] = false;
 
-        while (!permitAvailable)
-        {
-        };
-
-        if (needsPermit[ghostID - 1] == true)
-        {
-            permitAvailable = false;
-            needsPermit[ghostID - 1] = false;
-        }
-
-        // has key and permit
-    }
-}
 
 void ghostup(ghostStruct &ghost)
 {
@@ -801,6 +795,32 @@ int random_move(ghostStruct &ghost, int prevDirec)
     return prevDirec;
 }
 
+int leaveHouse(int ghostID, int pr, ghostStruct &ghost)
+{
+    int p = pr;
+   if(key[4] && key[ghostID+1])
+   {
+       int x = 15, y = 12;
+       key[4] = 0;
+     pair<int, int> pref = make_pair(ghost.ghostGridY - y, ghost.ghostGridX - x);
+
+        while(ghost.ghostGridY - y !=0 ||  ghost.ghostGridX - x != 0 )
+        {
+        pref = make_pair(ghost.ghostGridY - y, ghost.ghostGridX - x);
+        p = semi_Ai(ghost, p, pref);
+        }
+       key[ghostID] = 1;
+       key[4] =1;
+   }
+
+   else 
+   {
+        p = random_move(ghost, pr);
+   }
+
+return p;
+}
+
 void *ghost1Movement(void *arg)
 {
     ghost1.color = (Color::Magenta);
@@ -817,7 +837,11 @@ void *ghost1Movement(void *arg)
     {
         if( tickets[0])
      {
-        if (!ghost1.eaten)
+        if(ghost1.isInHome())
+        {
+         prevDirec = leaveHouse(0,prevDirec, ghost1);
+        }
+         else if (!ghost1.eaten)
         {
             prevDirec = random_move(ghost1, prevDirec);
         }
@@ -838,7 +862,7 @@ void *ghost1Movement(void *arg)
 void *ghost2Movement(void *arg)
 {
     ghost2.color = (Color::Red);
-    ghost2.ghostGridX = 17;
+    ghost2.ghostGridX = 15;
     ghost2.ghostGridY = 15;
     ghost2.x = 25 * ghost2.ghostGridX + 15;
     ghost2.y = 25 * ghost2.ghostGridY + 15;
@@ -851,7 +875,12 @@ void *ghost2Movement(void *arg)
     {
       if( tickets[1])
      {
-        if (!ghost2.eaten  )//&& !respawned)
+        if(ghost2.isInHome())
+        {
+         prevDirec = leaveHouse(1,prevDirec, ghost2);
+        }
+        else
+        if (!ghost2.eaten)//&& !respawned)
         {
             pair<int, int> pref = make_pair(ghost2.ghostGridY - pacman.pacmanGridY, ghost2.ghostGridX - pacman.pacmanGridX);
             prevDirec = semi_Ai(ghost2, prevDirec, pref);
@@ -885,6 +914,11 @@ void *ghost3Movement(void *arg)
     {
          if(tickets[2])
      {
+        if(ghost3.isInHome())
+        {
+         prevDirec = leaveHouse(2,prevDirec, ghost3);
+        }
+         else
         if (!ghost3.eaten)
         {
             prevDirec = random_move(ghost3, prevDirec);
@@ -911,12 +945,17 @@ void *ghost4Movement(void *arg)
     ghost4.ghostSprite.setColor(Color::Yellow);
     ghost4.ghostSprite.setPosition(ghost4.x, ghost4.y);
 
-    int prevDirec, directionInt = 0, actualMovement = 0;
+    int prevDirec =0, directionInt = 0, actualMovement = 0;
 
     while (!shouldExit)
     {
          if( tickets[3])
      {
+        if(ghost4.isInHome())
+        {
+         prevDirec = leaveHouse(3,prevDirec, ghost4);
+        }
+        else
         if (!ghost4.eaten )//&& !respawned)
         {
             pair<int, int> pref = make_pair(ghost4.ghostGridY - pacman.pacmanGridY, ghost4.ghostGridX - pacman.pacmanGridX);
