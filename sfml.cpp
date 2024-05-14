@@ -15,8 +15,8 @@ pthread_t scoreThread, ProducePallets;
 bool shouldExit = false;
 string action = "";
 char prevDirection = ' ', directon[] = {'U', 'D', 'R', 'L'};
-int uSleepTime = 450, score = 0, lives = 3;
-int uSleep = 100000;
+int uSleepTime = 10000, score = 0, lives = 3;
+int uSleep = 100000, extratime = 10500 , n= 9;
 float respawntime = 3.0f;
 float shield = 0.0f;
 bool respawned = false;
@@ -260,7 +260,7 @@ void *incScore(void *arg)
         for(int i = 0; i < 4; i++)
         { tickets[i] = 1; priorities[i] = i+1;}
          }
-    usleep(uSleepTime);
+   // usleep(uSleepTime -3000);
     }
     pthread_exit(0);
 }
@@ -496,21 +496,18 @@ void *pacmanMovement(void *arg)
 }
 
 
-
-
 void ghostup(ghostStruct &ghost)
 {
     --ghost.ghostGridY;
     ghost.x = 25 * ghost.ghostGridX + 10;
     ghost.y = 25 * ghost.ghostGridY + 10;
-    usleep(uSleepTime + 50000);
 }
 void ghostdown(ghostStruct &ghost)
 {
     ++ghost.ghostGridY;
     ghost.x = 25 * ghost.ghostGridX + 10;
     ghost.y = 25 * ghost.ghostGridY + 10;
-    usleep(uSleepTime + 50000);
+
 }
 void ghostleft(ghostStruct &ghost)
 {
@@ -526,7 +523,6 @@ void ghostleft(ghostStruct &ghost)
         ghost.x = 25 * ghost.ghostGridX + 10;
         ghost.y = 25 * ghost.ghostGridY + 10;
     }
-    usleep(uSleepTime + 50000);
 }
 void ghostright(ghostStruct &ghost)
 {
@@ -541,7 +537,7 @@ void ghostright(ghostStruct &ghost)
         ghost.x = 25 * ghost.ghostGridX + 10;
         ghost.y = 25 * ghost.ghostGridY + 10;
     }
-    usleep(uSleepTime + 50000);
+
 }
 
 int semi_Ai(ghostStruct &ghost, int prev, pair<int, int> pref)
@@ -852,8 +848,8 @@ void *ghost1Movement(void *arg)
         }
        priorities[0] = 0; 
        tickets[0] = 0; 
-    }
-    
+       usleep(uSleepTime ); //+ extratime -10000);
+    }       
     }
 
     pthread_exit(0);
@@ -892,6 +888,7 @@ void *ghost2Movement(void *arg)
         }
         tickets[1]=0;
         priorities[1]=0;
+        usleep(uSleepTime +extratime* n);
      }
     }
 
@@ -930,6 +927,7 @@ void *ghost3Movement(void *arg)
         }
         tickets[2] =0;
         priorities[2]=0;
+        usleep(uSleepTime );//+ extratime );
      }
     }
     pthread_exit(0);
@@ -968,6 +966,7 @@ void *ghost4Movement(void *arg)
         }
         tickets[3]=0;
         priorities[3]=0;
+        usleep(uSleepTime + extratime * n);
      }
     }
     pthread_exit(0);
